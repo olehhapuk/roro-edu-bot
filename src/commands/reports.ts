@@ -1,23 +1,28 @@
 import {
   BaseGuildTextChannel,
   ChatInputCommandInteraction,
-  Client,
   MessageFlags,
   SlashCommandBuilder,
-  TextBasedChannel,
 } from 'discord.js';
-import { commands } from './index';
 import { db } from '../db';
 import { lessonReportsTable } from '../db/schema/lesson-reports.table';
-import { asc, desc, eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { CommandData } from './command-data';
+import { requireRoles } from '../utils/require-roles';
 
 async function handleReportGenerate(interaction: ChatInputCommandInteraction) {
+  const isTeacher = requireRoles(interaction, ['Teacher']);
+  if (!isTeacher) {
+    await interaction.reply({
+      content: 'Only teacher can generate lesson reports.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
   const title = interaction.options.getString('title', true);
   const videoUrl = interaction.options.getString('video_url', true);
   const codeUrl = interaction.options.getString('code_url', true);
-
-  // TODO: Save the report to the database
 
   const classroom = await db.query.classrooms.findFirst({
     where: (classroomsTable) =>
