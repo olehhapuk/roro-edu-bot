@@ -10,6 +10,7 @@ import { asc, eq } from 'drizzle-orm';
 import { CommandData } from './command-data';
 import { requireRoles } from '../utils/require-roles';
 import { requireClassroom } from '../utils/require-classroom';
+import { format } from 'date-fns';
 
 async function handleReportGenerate(interaction: ChatInputCommandInteraction) {
   const isTeacher = requireRoles(interaction, ['Teacher']);
@@ -49,26 +50,11 @@ async function handleReportGenerate(interaction: ChatInputCommandInteraction) {
     .returning();
 
   await interaction.reply({
-    content: `Lesson report generated:\nTitle: ${title}\nVideo URL: ${videoUrl}\nCode URL: ${codeUrl}`,
-    flags: MessageFlags.Ephemeral,
+    content: `New lesson report(${format(
+      newReport.createdAt,
+      'dd.MM.yyyy'
+    )}):\n**${title}**\nVideo: ${videoUrl}\nCode: ${codeUrl}`,
   });
-  try {
-    const targetChannel = await interaction.client.channels.fetch(
-      classroom.channelId
-    );
-    if (
-      targetChannel &&
-      targetChannel.isTextBased() &&
-      targetChannel instanceof BaseGuildTextChannel
-    ) {
-      // Narrow to TextBasedChannel to satisfy TypeScript that send exists
-      await targetChannel.send({
-        content: `New lesson report (#${newReport.id}) created for this classroom:\n**${title}**\nVideo: ${videoUrl}\nCode: ${codeUrl}`,
-      });
-    }
-  } catch (err) {
-    console.error('Failed to send lesson report notification:', err);
-  }
 }
 
 async function handleReportList(interaction: ChatInputCommandInteraction) {
