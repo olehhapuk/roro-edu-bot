@@ -9,6 +9,7 @@ import { lessonReportsTable } from '../db/schema/lesson-reports.table';
 import { asc, eq } from 'drizzle-orm';
 import { CommandData } from './command-data';
 import { requireRoles } from '../utils/require-roles';
+import { requireClassroom } from '../utils/require-classroom';
 
 async function handleReportGenerate(interaction: ChatInputCommandInteraction) {
   const isTeacher = requireRoles(interaction, ['Teacher']);
@@ -159,6 +160,8 @@ export const reportsCommand: CommandData = {
       });
       return;
     }
+
+    requireClassroom(interaction);
 
     const subcommand = interaction.options.getSubcommand();
 

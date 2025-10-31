@@ -17,6 +17,7 @@ import {
 import { CommandData } from './command-data';
 import { requireRoles } from '../utils/require-roles';
 import { getStatusEmoji } from '../utils/get-status-emoji';
+import { requireClassroom } from '../utils/require-classroom';
 
 export async function handleHWAutocomplete(
   interaction: AutocompleteInteraction
@@ -493,6 +494,8 @@ export const hwCommand: CommandData = {
     if (!interaction.isChatInputCommand()) {
       return;
     }
+
+    requireClassroom(interaction);
 
     if (interaction.options.getSubcommand() === 'add') {
       await handleAddHomework(interaction);
