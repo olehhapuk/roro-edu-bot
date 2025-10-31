@@ -5,6 +5,7 @@ import {
   hwSubmissionsTable,
   hwSubmissionStatusEnum,
 } from './hw-submissions.table';
+import { lessonReportsTable } from './lesson-reports.table';
 
 export const schema = {
   classrooms: classroomsTable,
@@ -12,4 +13,5 @@ export const schema = {
   hwSubmissions: hwSubmissionsTable,
   hwSubmissionStatusEnum,
   hwSubmissionsRelations,
+  lessonReports: lessonReportsTable,
 };
