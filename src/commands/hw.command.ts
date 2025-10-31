@@ -22,7 +22,7 @@ import { requireClassroom } from '../utils/require-classroom';
 export async function handleHWAutocomplete(
   interaction: AutocompleteInteraction
 ) {
-  if (interaction.options.getSubcommand() === 'submit') {
+  if (['submit', 'delete'].includes(interaction.options.getSubcommand())) {
     const focusedOption = interaction.options.getFocused(true);
 
     if (focusedOption.name === 'homework_id') {
@@ -59,6 +59,51 @@ export async function handleHWAutocomplete(
         .map((hw) => ({
           name: `${hw.title} (Due: ${format(hw.dueDate, 'dd.MM.yyyy')})`,
           value: hw.id,
+        }));
+
+      await interaction.respond(choices);
+    }
+  } else if (interaction.options.getSubcommand() === 'unsubmit') {
+    const focusedOption = interaction.options.getFocused(true);
+
+    if (focusedOption.name === 'submission_id') {
+      if (!interaction.channel) {
+        await interaction.respond([]);
+        return;
+      }
+
+      const channelId = interaction.channel.id;
+      const studentId = interaction.user.id;
+
+      const classroom = await db.query.classrooms.findFirst({
+        where: () => eq(classroomsTable.channelId, channelId),
+      });
+
+      if (!classroom) {
+        await interaction.respond([]);
+        return;
+      }
+
+      const submissions = await db.query.hwSubmissions.findMany({
+        where: () =>
+          and(
+            eq(hwSubmissionsTable.studentId, studentId),
+            eq(hwSubmissionsTable.classroomId, classroom.id)
+          ),
+        orderBy: () => desc(hwSubmissionsTable.submittedAt),
+        limit: 25, // Discord autocomplete limit
+        with: {
+          homework: true,
+        },
+      });
+
+      const choices = submissions
+        .filter((submission) =>
+          submission.id.toString().includes(focusedOption.value.toString())
+        )
+        .map((submission) => ({
+          name: `Homework: ${submission.homework.title} (Status: ${submission.status})`,
+          value: submission.id.toString(),
         }));
 
       await interaction.respond(choices);
@@ -404,6 +449,121 @@ async function handleMySubmissions(interaction: ChatInputCommandInteraction) {
   });
 }
 
+async function handleDeleteHomework(interaction: ChatInputCommandInteraction) {
+  if (!interaction.channel) {
+    await interaction.reply({
+      content: 'This command can only be used in a text channel.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const isTeacher = requireRoles(interaction, ['Teacher']);
+  if (!isTeacher) {
+    await interaction.reply({
+      content: 'You do not have permission to delete homework.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const channelId = interaction.channel.id;
+  const homeworkId = interaction.options.getString('homework_id', true);
+
+  const classroom = await db.query.classrooms.findFirst({
+    where: () => eq(classroomsTable.channelId, channelId),
+  });
+
+  if (!classroom) {
+    await interaction.reply({
+      content:
+        'No classroom found for this channel. Please create a classroom first.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  // Verify homework exists and belongs to this classroom
+  const homework = await db.query.homeworks.findFirst({
+    where: () => eq(homeworksTable.id, homeworkId),
+  });
+
+  if (!homework || homework.classroomId !== classroom.id) {
+    await interaction.reply({
+      content:
+        'Invalid homework ID or homework does not belong to this classroom.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  await db.delete(homeworksTable).where(eq(homeworksTable.id, homeworkId));
+
+  await interaction.reply({
+    content: `Homework "${homework.title}" has been deleted successfully.`,
+    flags: MessageFlags.Ephemeral,
+  });
+}
+
+async function handleUnsubmitHomework(
+  interaction: ChatInputCommandInteraction
+) {
+  if (!interaction.channel) {
+    await interaction.reply({
+      content: 'This command can only be used in a text channel.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const channelId = interaction.channel.id;
+  const submissionId = interaction.options.getString('submission_id', true);
+  const studentId = interaction.user.id;
+
+  const classroom = await db.query.classrooms.findFirst({
+    where: () => eq(classroomsTable.channelId, channelId),
+  });
+
+  if (!classroom) {
+    await interaction.reply({
+      content:
+        'No classroom found for this channel. Please create a classroom first.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const submission = await db.query.hwSubmissions.findFirst({
+    where: () => eq(hwSubmissionsTable.id, submissionId),
+  });
+
+  if (!submission || submission.studentId !== studentId) {
+    await interaction.reply({
+      content:
+        'Invalid submission ID or you do not have permission to unsubmit this homework.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  if (submission.status !== HwSubmissionStatus.PENDING) {
+    await interaction.reply({
+      content: 'Only submissions with Pending status can be unsubmitted.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  await db
+    .delete(hwSubmissionsTable)
+    .where(eq(hwSubmissionsTable.id, submissionId));
+
+  await interaction.reply({
+    content: `Your submission (ID: ${submissionId}) has been successfully unsubmitted.`,
+    flags: MessageFlags.Ephemeral,
+  });
+}
+
 export const hwCommand: CommandData = {
   data: new SlashCommandBuilder()
     .setName('hw')
@@ -489,6 +649,30 @@ export const hwCommand: CommandData = {
               { name: 'Rejected', value: HwSubmissionStatus.REJECTED }
             )
         )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName('delete')
+        .setDescription('Delete a homework')
+        .addStringOption((option) =>
+          option
+            .setName('homework_id')
+            .setDescription('ID of the homework to delete')
+            .setRequired(true)
+            .setAutocomplete(true)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName('unsubmit')
+        .setDescription('Unsubmit homework')
+        .addStringOption((option) =>
+          option
+            .setName('submission_id')
+            .setDescription('ID of the homework submission to unsubmit')
+            .setRequired(true)
+            .setAutocomplete(true)
+        )
     ),
   async execute(interaction, client) {
     if (!interaction.isChatInputCommand()) {
@@ -507,6 +691,10 @@ export const hwCommand: CommandData = {
       await handleListSubmissions(interaction);
     } else if (interaction.options.getSubcommand() === 'my_submissions') {
       await handleMySubmissions(interaction);
+    } else if (interaction.options.getSubcommand() === 'delete') {
+      await handleDeleteHomework(interaction);
+    } else if (interaction.options.getSubcommand() === 'unsubmit') {
+      await handleUnsubmitHomework(interaction);
     }
   },
 };
