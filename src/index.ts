@@ -99,7 +99,6 @@ cron.schedule('0 12 * * *', async () => {
     });
 
     homeworks.forEach((hw) => {
-      console.log(hw);
       if (isSameDay(hw.dueDate, new Date())) {
         client.channels.fetch(hw.classroom.channelId).then((channel) => {
           if (channel?.isSendable()) {
