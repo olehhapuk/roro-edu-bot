@@ -11,6 +11,7 @@ import { CommandData } from './command-data';
 import { requireRoles } from '../utils/require-roles';
 import { requireClassroom } from '../utils/require-classroom';
 import { format } from 'date-fns';
+import { formatDate } from '../utils/format-date';
 
 async function handleReportGenerate(interaction: ChatInputCommandInteraction) {
   const isTeacher = requireRoles(interaction, ['Teacher']);
@@ -50,9 +51,8 @@ async function handleReportGenerate(interaction: ChatInputCommandInteraction) {
     .returning();
 
   await interaction.reply({
-    content: `New lesson report(${format(
-      newReport.createdAt,
-      'dd.MM.yyyy'
+    content: `New lesson report(${formatDate(
+      newReport.createdAt
     )}):\n**${title}**\nVideo: ${videoUrl}\nCode: ${codeUrl}`,
   });
 }

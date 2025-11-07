@@ -18,6 +18,7 @@ import { CommandData } from './command-data';
 import { requireRoles } from '../utils/require-roles';
 import { getStatusEmoji } from '../utils/get-status-emoji';
 import { requireClassroom } from '../utils/require-classroom';
+import { formatDate } from '../utils/format-date';
 
 export async function handleHWAutocomplete(
   interaction: AutocompleteInteraction
@@ -57,7 +58,7 @@ export async function handleHWAutocomplete(
             hw.id.includes(focusedOption.value)
         )
         .map((hw) => ({
-          name: `${hw.title} (Due: ${format(hw.dueDate, 'dd.MM.yyyy')})`,
+          name: `${hw.title} (Due: ${formatDate(hw.dueDate)})`,
           value: hw.id,
         }));
 
@@ -135,7 +136,9 @@ async function handleAddHomework(interaction: ChatInputCommandInteraction) {
   const dueDateStr = interaction.options.getString('due_date', true);
   const githubLink = interaction.options.getString('github_link', true);
 
-  const dueDate = new Date(dueDateStr.split('.').reverse().join('-'));
+  const dueDate = new Date(
+    dueDateStr.split('.').reverse().join('-') + 'T23:59:59'
+  );
 
   const classroom = await db.query.classrooms.findFirst({
     where: () => eq(classroomsTable.channelId, channelId),
@@ -159,11 +162,10 @@ async function handleAddHomework(interaction: ChatInputCommandInteraction) {
     .returning();
 
   await interaction.reply({
-    content: `Added new homework: **${newHomework.title}** (Due: _${format(
-      newHomework.dueDate,
-      'dd.MM.yyyy'
-    )}_)`,
-    flags: MessageFlags.Ephemeral,
+    content: `New homework: **${newHomework.title}** (Due: _${formatDate(
+      newHomework.dueDate
+    )}_)
+    GitHub Link: ${newHomework.githubLink}`,
   });
 }
 
@@ -207,9 +209,8 @@ async function handleListHomeworks(interaction: ChatInputCommandInteraction) {
   const homeworkList = homeworks
     .map(
       (hw, i) =>
-        `${i + 1}. **${hw.title}** — Due: _${format(
-          hw.dueDate,
-          'dd.MM.yyyy'
+        `${i + 1}. **${hw.title}** — Due: _${formatDate(
+          hw.dueDate
         )}_ — [GitHub Link](${hw.githubLink})`
     )
     .join('\n');
@@ -378,9 +379,8 @@ async function handleListSubmissions(interaction: ChatInputCommandInteraction) {
       (submission, i) =>
         `${i + 1}. Homework ID: **${submission.homework.title}** — Status: _${
           submission.status
-        }_${getStatusEmoji(submission.status)} — Submitted At: _${format(
-          submission.submittedAt,
-          'dd.MM.yyyy HH:mm'
+        }_${getStatusEmoji(submission.status)} — Submitted At: _${formatDate(
+          submission.submittedAt
         )}_ — [PR Link](${submission.githubPRLink})`
     )
     .join('\n');
@@ -436,9 +436,8 @@ async function handleMySubmissions(interaction: ChatInputCommandInteraction) {
       (submission, i) =>
         `${i + 1}. Homework ID: **${submission.homework.title}** — Status: _${
           submission.status
-        }_${getStatusEmoji(submission.status)} — Submitted At: _${format(
-          submission.submittedAt,
-          'dd.MM.yyyy HH:mm'
+        }_${getStatusEmoji(submission.status)} — Submitted At: _${formatDate(
+          submission.submittedAt
         )}_ — [PR Link](${submission.githubPRLink})`
     )
     .join('\n');

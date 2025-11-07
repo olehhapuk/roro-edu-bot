@@ -1,5 +1,6 @@
 import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { classroomsTable } from './classrooms.table';
+import { relations } from 'drizzle-orm';
 
 export const homeworksTable = pgTable('homeworks', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -20,3 +21,10 @@ export const homeworksTable = pgTable('homeworks', {
     .notNull(),
   githubLink: text('github_link').notNull(),
 });
+
+export const homeworksRelations = relations(homeworksTable, ({ one }) => ({
+  classroom: one(classroomsTable, {
+    fields: [homeworksTable.classroomId],
+    references: [classroomsTable.id],
+  }),
+}));

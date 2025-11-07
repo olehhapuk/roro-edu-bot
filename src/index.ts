@@ -8,9 +8,15 @@ import {
   Routes,
 } from 'discord.js';
 import 'dotenv/config';
+import cron from 'node-cron';
 import { events } from './server';
 import { commands } from './commands';
 import { handleHWAutocomplete } from './commands/hw.command';
+import { db } from './db';
+import { eq, lt, lte } from 'drizzle-orm';
+import { homeworksTable } from './db/schema/homeworks.table';
+import { format, isSameDay } from 'date-fns';
+import { formatDate } from './utils/format-date';
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
@@ -82,3 +88,33 @@ const rest = new REST().setToken(process.env.DISCORD_BOT_TOKEN!);
 })();
 
 client.login(process.env.DISCORD_BOT_TOKEN!);
+
+cron.schedule('0 12 * * *', async () => {
+  console.log('test');
+  try {
+    const homeworks = await db.query.homeworks.findMany({
+      with: {
+        classroom: true,
+      },
+    });
+
+    homeworks.forEach((hw) => {
+      console.log(hw);
+      if (isSameDay(hw.dueDate, new Date())) {
+        client.channels.fetch(hw.classroom.channelId).then((channel) => {
+          if (channel?.isSendable()) {
+            channel.send({
+              content: `⏰ Reminder: The homework **${
+                hw.title
+              }** is due ${formatDate(
+                hw.dueDate
+              )}! Please make sure to submit it on time.`,
+            });
+          }
+        });
+      }
+    });
+  } catch (error) {
+    console.log(error);
+  }
+});

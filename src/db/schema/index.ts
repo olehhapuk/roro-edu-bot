@@ -1,5 +1,5 @@
 import { classroomsTable } from './classrooms.table';
-import { homeworksTable } from './homeworks.table';
+import { homeworksRelations, homeworksTable } from './homeworks.table';
 import {
   hwSubmissionsRelations,
   hwSubmissionsTable,
@@ -14,4 +14,5 @@ export const schema = {
   hwSubmissionStatusEnum,
   hwSubmissionsRelations,
   lessonReports: lessonReportsTable,
+  homeworksRelations,
 };
